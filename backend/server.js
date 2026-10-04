@@ -4,13 +4,13 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const chatRoutes = require('./src/routes/chat');
 const adminUploadRoutes = require('./src/routes/admin/upload');
-
+const quizRoutes = require('./src/routes/quiz/index');
 const adminSubjectRoutes = require('./src/routes/admin/subjects');
+const statsRoutes = require('./src/routes/stats');
 const cors = require('cors');
 require('dotenv').config();
-console.log('🔑 GEMINI_API_KEY from .env:', process.env.GEMINI_API_KEY);
-console.log('📏 Key length:', process.env.GEMINI_API_KEY?.length || 0);
-console.log('📂 Current directory:', __dirname);
+
+
 // Import routes
 const authRoutes = require('./src/routes/auth');
 
@@ -21,7 +21,7 @@ const adminMiddleware = require('./src/middleware/admin');
 // Import models (for protected routes)
 const User = require('./src/models/User');
 
-// Add this line right after it:
+
 const Subject = require('./src/models/Subject');
 const Note = require('./src/models/Note');
 const PYQ = require('./src/models/PYQ');
@@ -264,7 +264,9 @@ app.get('/api/upload/pyq/:id', async (req, res) => {
 
 app.use('/api/chat', authMiddleware, chatRoutes);
 
+app.use('/api/quiz', authMiddleware, quizRoutes);
 
+app.use('/api/stats', authMiddleware, statsRoutes);
 app.listen(PORT, ()=>{
     console.log(`Server is running on port ${PORT}`);
 })

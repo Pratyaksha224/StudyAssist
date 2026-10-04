@@ -8,6 +8,9 @@ import AdminDashboard from './pages/AdminDashboard';  // ← ADD THIS IMPORT
 import StudentSubjects from './pages/StudentSubjects';
 import SubjectDetails from './pages/SubjectDetails';
 import EditProfile from './pages/EditProfile';
+import QuizHistory from './pages/QuizHistory';
+import Leaderboard from './pages/Leaderboard';
+import { OfflineProvider } from './context/OfflineContext';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -87,6 +90,16 @@ function AppRoutes() {
         <SubjectDetails />
     </ProtectedRoute>
 } />
+<Route path="/quiz-history" element={
+    <ProtectedRoute>
+        <QuizHistory />
+    </ProtectedRoute>
+} />
+<Route path="/leaderboard" element={
+    <ProtectedRoute>
+        <Leaderboard />
+    </ProtectedRoute>
+} />
     </Routes>
   );
 }
@@ -95,7 +108,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <OfflineProvider>
+            <AppRoutes />
+        </OfflineProvider>
       </AuthProvider>
     </BrowserRouter>
   );

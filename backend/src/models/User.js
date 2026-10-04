@@ -22,24 +22,22 @@ const UserSchema = new mongoose.Schema({
         trim: true,
     },
     // Which branch (EE, CS, ME, CE, ECE, Other)
-  branch: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Branch',
-    required: true,
-},
- 
+    branch: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Branch',
+        required: true,
+    },
     program: {
         type: String,
         enum: ['BTECH', 'DUAL', 'MTECH'],
-        required: true
+        required: true,
     },
-
     semester: {
         type: Number,
         required: true,
         min: 1,
-        max:10
-   },
+        max: 10,
+    },
     // Role: admin or student
     role: {
         type: String,
@@ -50,7 +48,36 @@ const UserSchema = new mongoose.Schema({
     createdAt: {
         type: Date,
         default: Date.now,
-    }
+    },
+    // ============================================================
+    // STATS - FIXED: Single stats object (not nested)
+    // ============================================================
+    stats: {
+        totalQuizzes: {
+            type: Number,
+            default: 0,
+        },
+        totalCorrect: {
+            type: Number,
+            default: 0,
+        },
+        totalAttempted: {
+            type: Number,
+            default: 0,
+        },
+        averageScore: {
+            type: Number,
+            default: 0,
+        },
+        studyStreak: {
+            type: Number,
+            default: 0,
+        },
+        lastActivityDate: {
+            type: Date,
+            default: null,
+        },
+    },
 });
 
 // Create the model from the schema

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 
+
 const StudentSubjects = () => {
     const { user, token } = useAuth();
     const [subjects, setSubjects] = useState([]);

@@ -3,15 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import { useParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
-import ReactMarkdown from "react-markdown";
-import remarkMath from "remark-math";
-import remarkGfm from "remark-gfm";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import 'katex/dist/katex.min.css';
+import QuizGenerator from '../components/QuizGenerator';
+import { useOffline } from '../context/OfflineContext';
 
 const SubjectDetails = () => {
     const { subjectId } = useParams();
     const { token, user } = useAuth();
+    const { isPinned, pinItem, unpinItem, getPinnedItem } = useOffline();
     const [subject, setSubject] = useState(null);
     const [notes, setNotes] = useState([]);
     const [pyqs, setPyqs] = useState([]);
@@ -72,6 +74,84 @@ const SubjectDetails = () => {
         } catch (err) {
             console.error('Delete error:', err);
             alert('Failed to delete. Please try again.');
+        }
+    };
+
+    // ============================================================
+    // PIN TOGGLE
+    // ============================================================
+    const handlePinToggle = async (item, type) => {
+        if (isPinned(item._id)) {
+            await unpinItem(item._id, type);
+        } else {
+            await pinItem(type, item);
+        }
+    };
+
+    // ============================================================
+    // VIEW PDF - WITH OFFLINE SUPPORT
+    // ============================================================
+    const handleViewPDF = async (id, type) => {
+        try {
+            console.log('📄 Viewing PDF:', id, type);
+            
+            const pinnedItem = await getPinnedItem(id, type);
+            console.log('📄 Pinned item found:', !!pinnedItem);
+            console.log('📄 Has PDF data:', !!pinnedItem?.pdfData);
+            
+            if (pinnedItem && pinnedItem.pdfData) {
+                console.log('📄 Opening PDF from IndexedDB (offline)');
+                const pdfWindow = window.open('', '_blank');
+                if (pdfWindow) {
+                    pdfWindow.document.write(`
+                        <html>
+                            <head>
+                                <title>${pinnedItem.title || 'PDF'}</title>
+                                <style>
+                                    body { margin: 0; padding: 0; height: 100vh; overflow: hidden; }
+                                    embed { width: 100%; height: 100%; border: none; }
+                                </style>
+                            </head>
+                            <body>
+                                <embed src="${pinnedItem.pdfData}" type="application/pdf" width="100%" height="100%" />
+                            </body>
+                        </html>
+                    `);
+                    pdfWindow.document.close();
+                }
+            } else {
+                console.log('📄 Opening PDF from server');
+                window.open(
+                    `http://localhost:5000/api/upload/${type}/${id}?token=${token}`,
+                    '_blank'
+                );
+            }
+        } catch (error) {
+            console.error('Error viewing PDF:', error);
+            alert('Failed to view PDF. Make sure you have internet access for unpinned materials.');
+        }
+    };
+
+    // ===== COPY HANDLER =====
+    const handleCopy = async (text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            const btn = document.activeElement;
+            if (btn) {
+                btn.textContent = '✅ Copied!';
+                setTimeout(() => {
+                    btn.textContent = '📋 Copy';
+                }, 2000);
+            }
+        } catch (err) {
+            console.error('Failed to copy:', err);
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            alert('✅ Copied to clipboard!');
         }
     };
 
@@ -166,6 +246,12 @@ const SubjectDetails = () => {
                         >
                             🤖 AI Chat
                         </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'quiz' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('quiz')}
+                        >
+                            📝 Quiz
+                        </button>
                     </div>
 
                     {/* Tab Content */}
@@ -180,7 +266,10 @@ const SubjectDetails = () => {
                                         <div key={note._id} className="material-item">
                                             <div className="material-icon">📄</div>
                                             <div className="material-info">
-                                                <h4>{note.title}</h4>
+                                                <h4>
+                                                    {note.title}
+                                                    {isPinned(note._id) && <span className="offline-badge"> ✅ Offline</span>}
+                                                </h4>
                                                 <p className="material-meta">
                                                     {note.module && `Module: ${note.module} • `}
                                                     {(note.fileSize / 1024 / 1024).toFixed(2)} MB
@@ -193,9 +282,15 @@ const SubjectDetails = () => {
                                             <div className="material-actions">
                                                 <button
                                                     className="view-btn"
-                                                    onClick={() => window.open(`http://localhost:5000/api/upload/note/${note._id}?token=${token}`, '_blank')}
+                                                    onClick={() => handleViewPDF(note._id, 'note')}
                                                 >
                                                     📄 View PDF
+                                                </button>
+                                                <button
+                                                    className={`pin-btn ${isPinned(note._id) ? 'pinned' : ''}`}
+                                                    onClick={() => handlePinToggle(note, 'note')}
+                                                >
+                                                    {isPinned(note._id) ? '📌 Pinned' : '📌 Pin'}
                                                 </button>
                                                 {user?.role === 'admin' && (
                                                     <button
@@ -222,7 +317,10 @@ const SubjectDetails = () => {
                                         <div key={pyq._id} className="material-item">
                                             <div className="material-icon">📝</div>
                                             <div className="material-info">
-                                                <h4>{pyq.title}</h4>
+                                                <h4>
+                                                    {pyq.title}
+                                                    {isPinned(pyq._id) && <span className="offline-badge"> ✅ Offline</span>}
+                                                </h4>
                                                 <p className="material-meta">
                                                     Year: {pyq.year} • {pyq.examType}
                                                     {pyq.uploadedBy && ` • Uploaded by ${pyq.uploadedBy.name}`}
@@ -234,9 +332,15 @@ const SubjectDetails = () => {
                                             <div className="material-actions">
                                                 <button
                                                     className="view-btn"
-                                                    onClick={() => window.open(`http://localhost:5000/api/upload/pyq/${pyq._id}?token=${token}`, '_blank')}
+                                                    onClick={() => handleViewPDF(pyq._id, 'pyq')}
                                                 >
                                                     📄 View PDF
+                                                </button>
+                                                <button
+                                                    className={`pin-btn ${isPinned(pyq._id) ? 'pinned' : ''}`}
+                                                    onClick={() => handlePinToggle(pyq, 'pyq')}
+                                                >
+                                                    {isPinned(pyq._id) ? '📌 Pinned' : '📌 Pin'}
                                                 </button>
                                                 {user?.role === 'admin' && (
                                                     <button
@@ -270,32 +374,43 @@ const SubjectDetails = () => {
                                                 key={idx}
                                                 className={`chat-message ${msg.role === 'user' ? 'user-message' : 'assistant-message'}`}
                                             >
-                                                <span className="chat-role">
-                                                    {msg.role === 'user' ? '👤 You' : '🤖 AI'}
-                                                </span>
+                                                <div className="chat-message-header">
+                                                    <span className="chat-role">
+                                                        {msg.role === 'user' ? '👤 You' : '🤖 AI'}
+                                                    </span>
+                                                    {msg.role === 'assistant' && (
+                                                        <button
+                                                            className="copy-btn"
+                                                            onClick={() => handleCopy(msg.content)}
+                                                            title="Copy response"
+                                                        >
+                                                            📋 Copy
+                                                        </button>
+                                                    )}
+                                                </div>
                                                 {msg.role === 'user' ? (
                                                     <p>{msg.content}</p>
                                                 ) : (
                                                     <div className="markdown-content">
-                                                    <ReactMarkdown
-                                                        remarkPlugins={[remarkGfm, remarkMath]}
-                                                        rehypePlugins={[rehypeKatex]}
-                                                        components={{
-                                                            table: ({ children }) => (
-                                                                <div className="table-wrapper">
-                                                                    <table className="markdown-table">{children}</table>
-                                                                </div>
-                                                            ),
-                                                            thead: ({ children }) => <thead>{children}</thead>,
-                                                            tbody: ({ children }) => <tbody>{children}</tbody>,
-                                                            tr: ({ children }) => <tr>{children}</tr>,
-                                                            th: ({ children }) => <th>{children}</th>,
-                                                            td: ({ children }) => <td>{children}</td>,
-                                                        }}
-                                                    >
-                                                        {msg.content}
-                                                    </ReactMarkdown>
-                                                </div>
+                                                        <ReactMarkdown
+                                                            remarkPlugins={[remarkMath]}
+                                                            rehypePlugins={[rehypeKatex]}
+                                                            components={{
+                                                                table: ({ children }) => (
+                                                                    <div className="table-wrapper">
+                                                                        <table className="markdown-table">{children}</table>
+                                                                    </div>
+                                                                ),
+                                                                thead: ({ children }) => <thead>{children}</thead>,
+                                                                tbody: ({ children }) => <tbody>{children}</tbody>,
+                                                                tr: ({ children }) => <tr>{children}</tr>,
+                                                                th: ({ children }) => <th>{children}</th>,
+                                                                td: ({ children }) => <td>{children}</td>,
+                                                            }}
+                                                        >
+                                                            {msg.content}
+                                                        </ReactMarkdown>
+                                                    </div>
                                                 )}
                                             </div>
                                         ))}
@@ -320,6 +435,13 @@ const SubjectDetails = () => {
                                         {chatLoading ? '⏳' : '➤'}
                                     </button>
                                 </form>
+                            </div>
+                        )}
+
+                        {/* ===== QUIZ TAB ===== */}
+                        {activeTab === 'quiz' && (
+                            <div className="quiz-tab">
+                                <QuizGenerator subjectId={subjectId} subjectName={subject.name} />
                             </div>
                         )}
                     </div>
